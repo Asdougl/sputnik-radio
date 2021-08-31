@@ -13,17 +13,28 @@ import { promisify } from 'util'
 
 const wait = promisify(setTimeout)
 
+interface QueueGuildInfo {
+  name: string
+  icon: string
+  acronym: string
+}
+
 export class MusicQueue {
   public readonly voiceConnection: VoiceConnection
   public readonly audioPlayer: AudioPlayer
+  public readonly guildInfo: QueueGuildInfo
   public queue: Track[]
   public queueLock = false
   public readyLock = false
 
-  public constructor(voiceConnection: VoiceConnection) {
+  public constructor(
+    voiceConnection: VoiceConnection,
+    guildInfo: QueueGuildInfo
+  ) {
     this.voiceConnection = voiceConnection
     this.audioPlayer = createAudioPlayer()
     this.queue = []
+    this.guildInfo = guildInfo
 
     this.voiceConnection.on('stateChange', async (oldState, newState) => {
       if (newState.status === VoiceConnectionStatus.Disconnected) {

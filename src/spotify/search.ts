@@ -1,37 +1,7 @@
 import axios from 'axios'
+import { isSpotifyError, SpotifyError, SpotifyInfo } from '.'
 import { youtubeSearch } from '../youtube/search'
 import { getSpotifyApiKey } from './keys'
-
-interface SpotifyAlbum {
-  name: string
-  href: string
-  id: string
-}
-
-interface SpotifyArtist {
-  id: string
-  name: string
-}
-
-interface SpotifyInfo {
-  album: SpotifyAlbum
-  artists: SpotifyArtist[]
-  name: string
-  popularity: string
-}
-
-interface SpotifyError {
-  error: {
-    status: number
-    message: string
-  }
-}
-
-const isSpotifyError = (
-  test: SpotifyInfo | SpotifyError
-): test is SpotifyError => {
-  return test.hasOwnProperty('error')
-}
 
 export const getSpotifyInfo = async (link: string) => {
   const match = link.match(

@@ -4,11 +4,13 @@ import {
   demuxProbe,
 } from '@discordjs/voice'
 import { raw as ytdl } from 'youtube-dl-exec'
-import { getInfo } from 'ytdl-core'
+import { getInfo, thumbnail } from 'ytdl-core'
 
 export interface TrackData {
   url: string
   title: string
+  thumbnail: thumbnail
+  duration: string
   onStart: () => void
   onFinish: () => void
   onError: (error: Error) => void
@@ -17,13 +19,25 @@ export interface TrackData {
 export class Track implements TrackData {
   public readonly url: string
   public readonly title: string
+  public readonly thumbnail: thumbnail
+  public readonly duration: string
   public readonly onStart: () => void
   public readonly onFinish: () => void
   public readonly onError: (error: Error) => void
 
-  private constructor({ url, title, onStart, onFinish, onError }: TrackData) {
+  private constructor({
+    url,
+    title,
+    thumbnail,
+    duration,
+    onStart,
+    onFinish,
+    onError,
+  }: TrackData) {
     this.url = url
     this.title = title
+    this.thumbnail = thumbnail
+    this.duration = duration
     this.onStart = onStart
     this.onFinish = onFinish
     this.onError = onError
@@ -106,6 +120,8 @@ export class Track implements TrackData {
 
     return new Track({
       title: info.videoDetails.title,
+      thumbnail: info.videoDetails.thumbnails[0],
+      duration: info.videoDetails.lengthSeconds,
       url,
       ...wrappedMethods,
     })

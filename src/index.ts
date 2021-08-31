@@ -14,8 +14,18 @@ import { createReply } from './helpers/replies'
 import { youtubeSearch } from './youtube/search'
 import { enqueueTrack } from './music/helpers'
 import { spotifyToYoutube } from './spotify/search'
+import './api'
 
 dotenv.config()
+
+// Map of Guild IDs matched to a music queue
+import { musicQueues } from './state'
+import { secondsToDuration } from './helpers/time'
+import { spotifyPlaylistToYoutube } from './spotify/playlist'
+
+/*
+  DISCORD BOT API
+===================================================== */
 
 // Initialise Client
 const client = new Client({
@@ -74,6 +84,14 @@ client.on('messageCreate', async (message) => {
           name: COMMANDS.GUI,
           description: 'Shows a link to the queue manager',
         },
+        {
+          name: COMMANDS.SEARCH,
+          description: 'Search for a song by name',
+        },
+        {
+          name: COMMANDS.API,
+          description: 'Returns the API url for your queue',
+        },
       ])
 
       await message.reply('Commands Deployed!')
@@ -83,9 +101,6 @@ client.on('messageCreate', async (message) => {
     }
   }
 })
-
-// Map of Guild IDs matched to a music queue
-const musicQueues = new Map<Snowflake, MusicQueue>()
 
 // Handle Command
 client.on('interactionCreate', async (interaction) => {
@@ -116,7 +131,12 @@ client.on('interactionCreate', async (interaction) => {
               channelId: channel.id,
               guildId: channel.guild.id,
               adapterCreator: channel.guild.voiceAdapterCreator,
-            })
+            }),
+            {
+              name: interaction.guild?.name || '',
+              icon: interaction.guild?.icon || '',
+              acronym: interaction.guild?.nameAcronym || '',
+            }
           )
           guildQueue.voiceConnection.on('error', console.warn)
           musicQueues.set(interaction.guildId, guildQueue)
@@ -149,7 +169,7 @@ client.on('interactionCreate', async (interaction) => {
         return
       }
 
-      let url = ''
+      let url: string | string[] = ''
       // Lets find out what kind of link we got...
       if (
         /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=)?.*$/.test(
@@ -162,6 +182,11 @@ client.on('interactionCreate', async (interaction) => {
         // Is a spotify share link!
         console.log('Found a spotify')
         url = await spotifyToYoutube(songQuery)
+      } else if (
+        /https?:\/\/open\.spotify\.com\/playlist\/.*$/.test(songQuery)
+      ) {
+        // Is a spotify playlist link
+        url = await spotifyPlaylistToYoutube(songQuery)
       } else {
         // We're going to need to google it!
         const searchResults = await youtubeSearch(songQuery)
@@ -180,20 +205,44 @@ client.on('interactionCreate', async (interaction) => {
         return
       }
 
-      const response = await enqueueTrack(guildQueue, interaction, url)
+      if (typeof url === 'string') {
+        const response = await enqueueTrack(guildQueue, interaction, url)
 
-      if (response.status) {
-        await interaction.followUp(
-          createReply(
-            `Enqueued **${response.track.title}** [<@${interaction.member?.user.id}>]`
+        if (response.status) {
+          await interaction.followUp(
+            createReply(
+              `Enqueued **${response.track.title}** [<@${interaction.member?.user.id}>]`
+            )
           )
-        )
+        } else {
+          await interaction.reply(
+            createReply('Failed to play track, please try again later!', {
+              status: 'warn',
+            })
+          )
+        }
       } else {
-        await interaction.reply(
-          createReply('Failed to play track, please try again later!', {
-            status: 'warn',
-          })
-        )
+        let success = false
+        let count = 0
+        for (const trackUrl of url) {
+          const result = await enqueueTrack(guildQueue, interaction, trackUrl)
+          if (result.status) {
+            success = true
+            count++
+          }
+        }
+
+        if (success) {
+          await interaction.followUp(
+            createReply(`Enqueued **${count} Tracks** from playlist`)
+          )
+        } else {
+          await interaction.followUp(
+            createReply('Failed to enqueue playlist, please try again later!', {
+              status: 'warn',
+            })
+          )
+        }
       }
 
       break
@@ -228,20 +277,34 @@ client.on('interactionCreate', async (interaction) => {
     case COMMANDS.QUEUE: {
       // Show current queue
       if (guildQueue) {
-        const current =
-          guildQueue.audioPlayer.state.status === AudioPlayerStatus.Idle
-            ? 'Nothing is currently playing!'
-            : `Playing **${
-                (guildQueue.audioPlayer.state.resource as AudioResource<Track>)
-                  .metadata.title
-              }**`
+        if (guildQueue.audioPlayer.state.status === AudioPlayerStatus.Idle) {
+          await interaction.reply(
+            createReply('Noting is currently in the queue')
+          )
+        } else {
+          const current = (
+            guildQueue.audioPlayer.state.resource as AudioResource<Track>
+          ).metadata
 
-        const queue = guildQueue.queue
-          .slice(0, 5)
-          .map((track, index) => `${index + 1} ${track.title}`)
-          .join('\n')
+          const nowPlaying = `**Now Playing:** \n\`\`\`nim\n${
+            current.title
+          } (${secondsToDuration(current.duration)})\n\`\`\``
+          const queue = guildQueue.queue
+            .slice(0, 5)
+            .map(
+              (track, index) =>
+                `${index + 1}) ${track.title} (${secondsToDuration(
+                  track.duration
+                )})`
+            )
+            .join('\n')
 
-        await interaction.reply(createReply(`${current}\n\n${queue}`))
+          const queueStr = '```nim\n' + queue + '```'
+
+          await interaction.reply(
+            createReply(`${nowPlaying}\n**Queue:**\n${queueStr}`)
+          )
+        }
       } else {
         await interaction.reply(
           createReply('Not playing in this server!', { status: 'warn' })
@@ -293,6 +356,16 @@ client.on('interactionCreate', async (interaction) => {
      * Command to Search for tracks and pick a result
      */
     case COMMANDS.SEARCH: {
+      await interaction.reply(
+        createReply('```\nFunctionality coming soon!\n```')
+      )
+      break
+    }
+    /**
+     * Fetch the Guild ID -- temporary/debug
+     */
+    case COMMANDS.API: {
+      await interaction.reply(`http://localhost:5000/${interaction.guildId}`)
       break
     }
     /**
