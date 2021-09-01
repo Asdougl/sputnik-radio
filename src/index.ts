@@ -429,9 +429,13 @@ client.on('interactionCreate', async (interaction) => {
     case COMMANDS.SHUFFLE: {
       if (guildQueue) {
         guildQueue.shuffle()
+        await interaction.reply(
+          createReply(`[<@${interaction.user.id}>] just shuffled the queue`)
+        )
       } else {
         await interaction.reply('Not playing in this server!')
       }
+      break
     }
     /**
      * Somehow the user has used an unknown command -- handle it
