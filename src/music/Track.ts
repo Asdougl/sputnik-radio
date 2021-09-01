@@ -5,12 +5,15 @@ import {
 } from '@discordjs/voice'
 import { raw as ytdl } from 'youtube-dl-exec'
 import { getInfo, thumbnail } from 'ytdl-core'
+import fs from 'fs'
+import { Enqueueable, QueueOrigin, TrackMetadata } from '../types/queue'
 
 export interface TrackData {
   url: string
-  title: string
-  thumbnail: thumbnail
-  duration: string
+  origin: QueueOrigin
+  metadata: TrackMetadata
+  channelId: string
+  queuedBy: string
   onStart: () => void
   onFinish: () => void
   onError: (error: Error) => void
@@ -18,29 +21,40 @@ export interface TrackData {
 
 export class Track implements TrackData {
   public readonly url: string
-  public readonly title: string
-  public readonly thumbnail: thumbnail
-  public readonly duration: string
+  public readonly origin: QueueOrigin
+  public readonly metadata: TrackMetadata
+  public readonly channelId: string
+  public readonly queuedBy: string
   public readonly onStart: () => void
   public readonly onFinish: () => void
   public readonly onError: (error: Error) => void
 
   private constructor({
     url,
-    title,
-    thumbnail,
-    duration,
+    metadata,
+    origin,
+    channelId,
+    queuedBy,
     onStart,
     onFinish,
     onError,
   }: TrackData) {
     this.url = url
-    this.title = title
-    this.thumbnail = thumbnail
-    this.duration = duration
+    this.metadata = metadata
+    this.origin = origin
+    this.channelId = channelId
+    this.queuedBy = queuedBy
     this.onStart = onStart
     this.onFinish = onFinish
     this.onError = onError
+  }
+
+  public getTitle() {
+    if (this.origin === 'youtube') {
+      return this.metadata.title
+    } else {
+      return `${this.metadata.title} - ${this.metadata.artist}`
+    }
   }
 
   /**
@@ -98,10 +112,20 @@ export class Track implements TrackData {
    * @returns The created Track
    */
   public static async from(
-    url: string,
+    enqueueable: Enqueueable,
     methods: Pick<Track, 'onStart' | 'onFinish' | 'onError'>
   ): Promise<Track> {
-    const info = await getInfo(url)
+    let metadata = enqueueable.metadata
+    if (!metadata) {
+      const info = await getInfo(enqueueable.url)
+      metadata = {
+        title: info.videoDetails.title,
+        artist: info.videoDetails.author.name,
+        album: '',
+        artwork_url: info.videoDetails.thumbnails[0],
+        duration: parseInt(info.videoDetails.lengthSeconds),
+      }
+    }
 
     const wrappedMethods = {
       onStart() {
@@ -119,10 +143,11 @@ export class Track implements TrackData {
     }
 
     return new Track({
-      title: info.videoDetails.title,
-      thumbnail: info.videoDetails.thumbnails[0],
-      duration: info.videoDetails.lengthSeconds,
-      url,
+      metadata,
+      url: enqueueable.url,
+      origin: enqueueable.origin,
+      channelId: enqueueable.channelId,
+      queuedBy: enqueueable.queuedBy,
       ...wrappedMethods,
     })
   }

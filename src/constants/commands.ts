@@ -7,4 +7,5 @@ export enum COMMANDS {
   GUI = 'gui',
   SEARCH = 'search',
   API = 'api',
+  SHUFFLE = 'shuffle',
 }

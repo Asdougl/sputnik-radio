@@ -1,4 +1,6 @@
 import { CommandInteraction } from 'discord.js'
+import { createReply } from '../helpers/replies'
+import { Enqueueable } from '../types/queue'
 import { MusicQueue } from './Queue'
 import { Track } from './Track'
 
@@ -16,10 +18,11 @@ interface EnqueueTrackResultFailure extends EnqueueTrackResult {
 export const enqueueTrack = async (
   guildQueue: MusicQueue,
   interaction: CommandInteraction,
-  url: string
+  enqueueable: Enqueueable,
+  wait?: boolean
 ): Promise<EnqueueTrackResultSuccess | EnqueueTrackResultFailure> => {
   try {
-    const track = await Track.from(url, {
+    const track = await Track.from(enqueueable, {
       onStart() {
         interaction
           .followUp({ content: 'Now playing!', ephemeral: true })
@@ -41,7 +44,7 @@ export const enqueueTrack = async (
       },
     })
 
-    guildQueue.enqueue(track)
+    guildQueue.enqueue(track, wait)
 
     return { status: true, track }
   } catch (error) {

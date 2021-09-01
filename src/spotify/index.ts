@@ -14,6 +14,7 @@ export interface SpotifyInfo {
   artists: SpotifyArtist[]
   name: string
   popularity: string
+  duration_ms: number
 }
 
 export interface SpotifyError {

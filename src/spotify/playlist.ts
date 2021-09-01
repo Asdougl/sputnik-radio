@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { isSpotifyError, SpotifyError, SpotifyInfo } from '.'
+import { Enqueueable } from '../types/queue'
 import { youtubeSearch } from '../youtube/search'
 import { getSpotifyApiKey } from './keys'
 
@@ -51,9 +52,13 @@ export const getSpotifyPlaylist = async (link: string) => {
   return null
 }
 
-export const spotifyPlaylistToYoutube = async (link: string) => {
+export const spotifyPlaylistToYoutube = async (
+  link: string,
+  channelId: string,
+  queuedBy: string
+) => {
   const spotifyInfoArr = await getSpotifyPlaylist(link)
-  if (spotifyInfoArr === null || !spotifyInfoArr.length) return ''
+  if (spotifyInfoArr === null || !spotifyInfoArr.length) return null
 
   const searchPromises = spotifyInfoArr.map((info) =>
     youtubeSearch(`${info.name}, ${info.artists[0].name}`)
@@ -61,12 +66,27 @@ export const spotifyPlaylistToYoutube = async (link: string) => {
 
   const searchResults = await Promise.all(searchPromises)
 
-  let resultIds: string[] = []
-  for (const result of searchResults) {
+  let results: Enqueueable[] = []
+  searchResults.forEach((result, index) => {
     if (result.length) {
-      resultIds = [...resultIds, result[0].id.videoId]
+      results = [
+        ...results,
+        {
+          origin: 'spotify-playlist',
+          url: `http://www.youtube.com/watch?v=${result[0].videoId}`,
+          channelId,
+          queuedBy,
+          metadata: {
+            title: spotifyInfoArr[index].name,
+            artist: spotifyInfoArr[index].artists[0].name,
+            album: spotifyInfoArr[index].album.name,
+            artwork_url: result[0].thumbnails[0],
+            duration: Math.round(spotifyInfoArr[index].duration_ms / 1000),
+          },
+        },
+      ]
     }
-  }
+  })
 
-  return resultIds.length ? resultIds : ''
+  return results.length ? results : null
 }

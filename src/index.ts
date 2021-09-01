@@ -22,6 +22,8 @@ dotenv.config()
 import { musicQueues } from './state'
 import { secondsToDuration } from './helpers/time'
 import { spotifyPlaylistToYoutube } from './spotify/playlist'
+import { formatToWidth } from './helpers/formatting'
+import { Enqueueable } from './types/queue'
 
 /*
   DISCORD BOT API
@@ -92,6 +94,10 @@ client.on('messageCreate', async (message) => {
           name: COMMANDS.API,
           description: 'Returns the API url for your queue',
         },
+        {
+          name: COMMANDS.SHUFFLE,
+          description: 'Shuffle the current queue',
+        },
       ])
 
       await message.reply('Commands Deployed!')
@@ -136,6 +142,13 @@ client.on('interactionCreate', async (interaction) => {
               name: interaction.guild?.name || '',
               icon: interaction.guild?.icon || '',
               acronym: interaction.guild?.nameAcronym || '',
+            },
+            async (channelId) => {
+              const channel = await client.channels.fetch(channelId)
+              if (channel && channel.isText()) {
+                return channel
+              }
+              return null
             }
           )
           guildQueue.voiceConnection.on('error', console.warn)
@@ -169,7 +182,7 @@ client.on('interactionCreate', async (interaction) => {
         return
       }
 
-      let url: string | string[] = ''
+      let enqueue: null | Enqueueable | Enqueueable[] = []
       // Lets find out what kind of link we got...
       if (
         /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=)?.*$/.test(
@@ -177,25 +190,51 @@ client.on('interactionCreate', async (interaction) => {
         )
       ) {
         // Is a youtube link!
-        url = songQuery
+        enqueue = {
+          origin: 'youtube',
+          url: songQuery,
+          channelId: interaction.channelId,
+          queuedBy: interaction.user.id,
+        }
       } else if (/https?:\/\/open\.spotify\.com\/track\/.*$/.test(songQuery)) {
         // Is a spotify share link!
-        console.log('Found a spotify')
-        url = await spotifyToYoutube(songQuery)
+        enqueue = await spotifyToYoutube(
+          songQuery,
+          interaction.channelId,
+          interaction.user.id
+        )
       } else if (
         /https?:\/\/open\.spotify\.com\/playlist\/.*$/.test(songQuery)
       ) {
         // Is a spotify playlist link
-        url = await spotifyPlaylistToYoutube(songQuery)
+        enqueue = await spotifyPlaylistToYoutube(
+          songQuery,
+          interaction.channelId,
+          interaction.user.id
+        )
       } else {
         // We're going to need to google it!
         const searchResults = await youtubeSearch(songQuery)
-        if (!searchResults.length) url = ''
+        if (!searchResults.length) enqueue = null
         else
-          url = `https://www.youtube.com/watch?v=${searchResults[0].id.videoId}`
+          enqueue = {
+            origin: 'youtube-music',
+            url: `https://www.youtube.com/watch?v=${searchResults[0].videoId}`,
+            channelId: interaction.channelId,
+            queuedBy: interaction.user.id,
+            metadata: {
+              title: searchResults[0].name,
+              artist: Array.isArray(searchResults[0].artist)
+                ? searchResults[0].artist[0].name
+                : searchResults[0].artist.name,
+              album: searchResults[0].album.name,
+              artwork_url: searchResults[0].thumbnails[0],
+              duration: searchResults[0].duration / 1000,
+            },
+          }
       }
 
-      if (!url) {
+      if (!enqueue) {
         await interaction.followUp(
           createReply(
             "We're not sure what to do with your song request... Sorry!",
@@ -205,13 +244,15 @@ client.on('interactionCreate', async (interaction) => {
         return
       }
 
-      if (typeof url === 'string') {
-        const response = await enqueueTrack(guildQueue, interaction, url)
+      if (!Array.isArray(enqueue)) {
+        const response = await enqueueTrack(guildQueue, interaction, enqueue)
 
         if (response.status) {
           await interaction.followUp(
             createReply(
-              `Enqueued **${response.track.title}** [<@${interaction.member?.user.id}>]`
+              `Enqueued **${response.track.getTitle()}** [<@${
+                interaction.member?.user.id
+              }>]`
             )
           )
         } else {
@@ -224,8 +265,13 @@ client.on('interactionCreate', async (interaction) => {
       } else {
         let success = false
         let count = 0
-        for (const trackUrl of url) {
-          const result = await enqueueTrack(guildQueue, interaction, trackUrl)
+        for (const trackUrl of enqueue) {
+          const result = await enqueueTrack(
+            guildQueue,
+            interaction,
+            trackUrl,
+            true
+          )
           if (result.status) {
             success = true
             count++
@@ -233,6 +279,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (success) {
+          guildQueue.start()
           await interaction.followUp(
             createReply(`Enqueued **${count} Tracks** from playlist`)
           )
@@ -258,7 +305,7 @@ client.on('interactionCreate', async (interaction) => {
       ) {
         const currentTrackName = (
           guildQueue.audioPlayer.state.resource as AudioResource<Track>
-        ).metadata.title
+        ).metadata.getTitle()
         guildQueue.audioPlayer.stop()
         await interaction.reply(
           createReply(
@@ -286,23 +333,31 @@ client.on('interactionCreate', async (interaction) => {
             guildQueue.audioPlayer.state.resource as AudioResource<Track>
           ).metadata
 
-          const nowPlaying = `**Now Playing:** \n\`\`\`nim\n${
-            current.title
-          } (${secondsToDuration(current.duration)})\n\`\`\``
+          const trackNameWidth = 40
+
+          const nowPlaying = `**Now Playing:** \n\`\`\`nim\n-> ${formatToWidth(
+            current.getTitle(),
+            trackNameWidth
+          )} (${secondsToDuration(current.metadata.duration)})\n\`\`\``
           const queue = guildQueue.queue
-            .slice(0, 5)
+            .slice(0, 10)
             .map(
               (track, index) =>
-                `${index + 1}) ${track.title} (${secondsToDuration(
-                  track.duration
-                )})`
+                `${index + 1}) ${formatToWidth(
+                  track.getTitle(),
+                  trackNameWidth
+                )} (${secondsToDuration(track.metadata.duration)})`
             )
             .join('\n')
+          const remainingCount = guildQueue.queue.length - queue.length
+          const remaining =
+            remainingCount > 0 ? `\nand **${remainingCount}** more` : ''
 
-          const queueStr = '```nim\n' + queue + '```'
+          const queueStr =
+            '```nim\n' + (queue.length ? queue : '*end of queue*') + '```'
 
           await interaction.reply(
-            createReply(`${nowPlaying}\n**Queue:**\n${queueStr}`)
+            createReply(`${nowPlaying}\n**Queue:**\n${queueStr}${remaining}`)
           )
         }
       } else {
@@ -369,6 +424,16 @@ client.on('interactionCreate', async (interaction) => {
       break
     }
     /**
+     * Shuffle the current queue
+     */
+    case COMMANDS.SHUFFLE: {
+      if (guildQueue) {
+        guildQueue.shuffle()
+      } else {
+        await interaction.reply('Not playing in this server!')
+      }
+    }
+    /**
      * Somehow the user has used an unknown command -- handle it
      */
     default: {
@@ -379,4 +444,4 @@ client.on('interactionCreate', async (interaction) => {
 
 client.on('error', console.warn)
 
-client.login(process.env.TOKEN)
+client.login(process.env.DISCORD_TOKEN)

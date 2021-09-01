@@ -10,6 +10,9 @@ import {
 } from '@discordjs/voice'
 import { Track } from './Track'
 import { promisify } from 'util'
+import { Message, TextBasedChannels } from 'discord.js'
+import { createNowPlaying, createReply } from '../helpers/replies'
+import { shuffle } from '../helpers/arrays'
 
 const wait = promisify(setTimeout)
 
@@ -23,18 +26,25 @@ export class MusicQueue {
   public readonly voiceConnection: VoiceConnection
   public readonly audioPlayer: AudioPlayer
   public readonly guildInfo: QueueGuildInfo
+  public readonly getChannel: (
+    channelId: string
+  ) => Promise<TextBasedChannels | null>
+  public lastMessage: Message | null
   public queue: Track[]
   public queueLock = false
   public readyLock = false
 
   public constructor(
     voiceConnection: VoiceConnection,
-    guildInfo: QueueGuildInfo
+    guildInfo: QueueGuildInfo,
+    getChannel: (channelId: string) => Promise<TextBasedChannels | null>
   ) {
     this.voiceConnection = voiceConnection
     this.audioPlayer = createAudioPlayer()
     this.queue = []
     this.guildInfo = guildInfo
+    this.lastMessage = null
+    this.getChannel = getChannel
 
     this.voiceConnection.on('stateChange', async (oldState, newState) => {
       if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -114,11 +124,27 @@ export class MusicQueue {
       ) {
         // If the Idle state is entered from a non-Idle state, it means that an audio resource has finished playing.
         // The queue is then processed to start playing the next track, if one is available.
-        ;(oldState.resource as AudioResource<Track>).metadata.onFinish()
+        if (this.lastMessage) {
+          this.lastMessage.delete().catch((err) => console.warn(err))
+        } else {
+          console.log('NO LAST MESSAGE?!')
+        }
         void this.processQueue()
       } else if (newState.status === AudioPlayerStatus.Playing) {
         // If the Playing state has been entered, then a new track has started playback.
-        ;(newState.resource as AudioResource<Track>).metadata.onStart()
+        const newTrack = (newState.resource as AudioResource<Track>).metadata
+        getChannel(newTrack.channelId)
+          .then((channel) => {
+            if (channel) {
+              channel
+                .send(createNowPlaying(newTrack.metadata, newTrack.queuedBy))
+                .then((message) => {
+                  this.lastMessage = message
+                })
+                .catch((err) => console.warn(err))
+            }
+          })
+          .catch((err) => console.warn(err))
       }
     })
 
@@ -129,15 +155,29 @@ export class MusicQueue {
     voiceConnection.subscribe(this.audioPlayer)
   }
 
-  public enqueue(track: Track) {
+  public enqueue(track: Track, wait?: boolean) {
     this.queue = [...this.queue, track]
-    void this.processQueue()
+    if (wait !== true) void this.processQueue()
   }
 
   public stop() {
-    this.queueLock = true
     this.queue = []
     this.audioPlayer.stop(true)
+  }
+
+  public start() {
+    if (
+      this.audioPlayer.state.status === AudioPlayerStatus.Idle &&
+      this.queue.length &&
+      this.queueLock === false
+    )
+      this.processQueue()
+  }
+
+  public shuffle() {
+    if (this.queue.length) {
+      this.queue = shuffle(this.queue)
+    }
   }
 
   private async processQueue(): Promise<void> {
