@@ -4,30 +4,30 @@ import {
   demuxProbe,
 } from '@discordjs/voice'
 import { raw as ytdl } from 'youtube-dl-exec'
-import { getInfo, thumbnail } from 'ytdl-core'
-import fs from 'fs'
-import { Enqueueable, QueueOrigin, TrackMetadata } from '../types/queue'
+import { getInfo } from 'ytdl-core'
+import { v4 as uuidv4 } from 'uuid'
+import {
+  Enqueueable,
+  ExtendedTrackMetadata,
+  QueueOrigin,
+  TrackMetadata,
+} from '../types/queue'
 
 export interface TrackData {
   url: string
   origin: QueueOrigin
   metadata: TrackMetadata
-  channelId: string
-  queuedBy: string
-  onStart: () => void
-  onFinish: () => void
-  onError: (error: Error) => void
+  channelId: string | undefined
+  queuedBy: string | undefined
 }
 
 export class Track implements TrackData {
   public readonly url: string
   public readonly origin: QueueOrigin
   public readonly metadata: TrackMetadata
-  public readonly channelId: string
-  public readonly queuedBy: string
-  public readonly onStart: () => void
-  public readonly onFinish: () => void
-  public readonly onError: (error: Error) => void
+  public readonly channelId: string | undefined
+  public readonly queuedBy: string | undefined
+  public readonly id: string
 
   private constructor({
     url,
@@ -35,18 +35,13 @@ export class Track implements TrackData {
     origin,
     channelId,
     queuedBy,
-    onStart,
-    onFinish,
-    onError,
   }: TrackData) {
     this.url = url
     this.metadata = metadata
     this.origin = origin
     this.channelId = channelId
     this.queuedBy = queuedBy
-    this.onStart = onStart
-    this.onFinish = onFinish
-    this.onError = onError
+    this.id = uuidv4()
   }
 
   public getTitle() {
@@ -105,16 +100,20 @@ export class Track implements TrackData {
     })
   }
 
+  public getExtMetadata = (): ExtendedTrackMetadata => ({
+    origin: this.origin,
+    url: this.url,
+    id: this.id,
+    ...this.metadata,
+  })
+
   /**
    * Create a Trakc from a video URL and lifecycle callback methods
    * @param url The URL of the video
    * @param methods Lifecycle callbacks
    * @returns The created Track
    */
-  public static async from(
-    enqueueable: Enqueueable,
-    methods: Pick<Track, 'onStart' | 'onFinish' | 'onError'>
-  ): Promise<Track> {
+  public static async from(enqueueable: Enqueueable): Promise<Track> {
     let metadata = enqueueable.metadata
     if (!metadata) {
       const info = await getInfo(enqueueable.url)
@@ -127,28 +126,12 @@ export class Track implements TrackData {
       }
     }
 
-    const wrappedMethods = {
-      onStart() {
-        wrappedMethods.onStart = () => {}
-        methods.onStart()
-      },
-      onFinish() {
-        wrappedMethods.onFinish = () => {}
-        methods.onFinish()
-      },
-      onError(error: Error) {
-        wrappedMethods.onError = () => {}
-        methods.onError(error)
-      },
-    }
-
     return new Track({
       metadata,
       url: enqueueable.url,
       origin: enqueueable.origin,
       channelId: enqueueable.channelId,
       queuedBy: enqueueable.queuedBy,
-      ...wrappedMethods,
     })
   }
 }

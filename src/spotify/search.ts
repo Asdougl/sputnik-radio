@@ -44,8 +44,8 @@ export const getSpotifyInfo = async (link: string) => {
 
 export const spotifyToYoutube = async (
   link: string,
-  channelId: string,
-  queuedBy: string
+  channelId?: string,
+  queuedBy?: string
 ): Promise<Enqueueable | null> => {
   const spotifyInfo = await getSpotifyInfo(link)
   if (spotifyInfo === null) return null

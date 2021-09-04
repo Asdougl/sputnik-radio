@@ -10,11 +10,24 @@ import {
 } from '@discordjs/voice'
 import { Track } from './Track'
 import { promisify } from 'util'
-import { Message, TextBasedChannels } from 'discord.js'
+import {
+  Message,
+  MessageOptions,
+  MessagePayload,
+  TextBasedChannels,
+} from 'discord.js'
 import { createNowPlaying, createReply } from '../helpers/replies'
 import { shuffle } from '../helpers/arrays'
+import EventEmitter from 'events'
+import { ExtendedTrackMetadata } from '../types/queue'
 
 const wait = promisify(setTimeout)
+
+type QueueEventMap = {
+  next: string
+  queue: ExtendedTrackMetadata
+  clear: undefined
+}
 
 interface QueueGuildInfo {
   name: string
@@ -33,6 +46,9 @@ export class MusicQueue {
   public queue: Track[]
   public queueLock = false
   public readyLock = false
+  public readonly queueEmitter: EventEmitter
+
+  private lastChannelId: string
 
   public constructor(
     voiceConnection: VoiceConnection,
@@ -45,6 +61,9 @@ export class MusicQueue {
     this.guildInfo = guildInfo
     this.lastMessage = null
     this.getChannel = getChannel
+    this.lastChannelId = ''
+
+    this.queueEmitter = new EventEmitter()
 
     this.voiceConnection.on('stateChange', async (oldState, newState) => {
       if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -133,36 +152,34 @@ export class MusicQueue {
       } else if (newState.status === AudioPlayerStatus.Playing) {
         // If the Playing state has been entered, then a new track has started playback.
         const newTrack = (newState.resource as AudioResource<Track>).metadata
-        getChannel(newTrack.channelId)
-          .then((channel) => {
-            if (channel) {
-              channel
-                .send(createNowPlaying(newTrack.metadata, newTrack.queuedBy))
-                .then((message) => {
-                  this.lastMessage = message
-                })
-                .catch((err) => console.warn(err))
-            }
-          })
-          .catch((err) => console.warn(err))
+        this.emit('next', newTrack.id)
+        this.sendMessage(
+          createNowPlaying(newTrack.metadata, newTrack.queuedBy),
+          newTrack
+        )
       }
     })
 
-    this.audioPlayer.on('error', (error) =>
-      (error.resource as AudioResource<Track>).metadata.onError(error)
-    )
+    this.audioPlayer.on('error', (error) => {
+      const metadata = (error.resource as AudioResource<Track>).metadata
+      this.sendMessage(
+        createReply(`Error Playing ${metadata.getTitle()}`, { status: 'warn' })
+      )
+    })
 
     voiceConnection.subscribe(this.audioPlayer)
   }
 
   public enqueue(track: Track, wait?: boolean) {
     this.queue = [...this.queue, track]
+    this.emit('queue', track.getExtMetadata())
     if (wait !== true) void this.processQueue()
   }
 
   public stop() {
     this.queue = []
     this.audioPlayer.stop(true)
+    this.emit('clear', undefined)
   }
 
   public start() {
@@ -178,6 +195,27 @@ export class MusicQueue {
     if (this.queue.length) {
       this.queue = shuffle(this.queue)
     }
+  }
+
+  public on<T extends keyof QueueEventMap>(
+    event: T,
+    fn: (param: QueueEventMap[T]) => void
+  ) {
+    this.queueEmitter.on(event, fn)
+  }
+
+  public off<T extends keyof QueueEventMap>(
+    event: T,
+    fn: (param: QueueEventMap[T]) => void
+  ) {
+    this.queueEmitter.off(event, fn)
+  }
+
+  private emit<T extends keyof QueueEventMap>(
+    event: T,
+    param: QueueEventMap[T]
+  ) {
+    this.queueEmitter.emit(event, param)
   }
 
   private async processQueue(): Promise<void> {
@@ -198,9 +236,31 @@ export class MusicQueue {
       this.audioPlayer.play(resource)
       this.queueLock = false
     } catch (error) {
-      nextTrack.onError(error as Error)
+      this.sendMessage(
+        createReply(`Error Playing ${nextTrack.getTitle()}`, { status: 'warn' })
+      )
       this.queueLock = false
       return this.processQueue()
     }
+  }
+
+  private async sendMessage(
+    messageContents: string | MessagePayload | MessageOptions,
+    track?: Track
+  ) {
+    this.getChannel(
+      track && track.channelId ? track.channelId : this.lastChannelId
+    )
+      .then((channel) => {
+        if (channel) {
+          channel
+            .send(messageContents)
+            .then((message) => {
+              this.lastMessage = message
+            })
+            .catch((err) => console.warn(err))
+        }
+      })
+      .catch((err) => console.warn(err))
   }
 }

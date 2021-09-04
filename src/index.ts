@@ -11,19 +11,16 @@ import { MusicQueue } from './music/Queue'
 import { Track } from './music/Track'
 import { COMMANDS } from './constants/commands'
 import { createReply } from './helpers/replies'
-import { youtubeSearch } from './youtube/search'
-import { enqueueTrack } from './music/helpers'
-import { spotifyToYoutube } from './spotify/search'
 import './api'
+import { musicQueues } from './state'
+import { secondsToDuration } from './helpers/time'
+import { formatToWidth } from './helpers/formatting'
+import { cannotDJ, cannotDJReason } from './helpers/roles'
+import { determineQueue, enqueueItem } from './queue'
 
 dotenv.config()
 
 // Map of Guild IDs matched to a music queue
-import { musicQueues } from './state'
-import { secondsToDuration } from './helpers/time'
-import { spotifyPlaylistToYoutube } from './spotify/playlist'
-import { formatToWidth } from './helpers/formatting'
-import { Enqueueable } from './types/queue'
 
 /*
   DISCORD BOT API
@@ -37,6 +34,10 @@ const client = new Client({
     Intents.FLAGS.GUILD_VOICE_STATES,
   ],
 })
+
+const djrole = process.env.DJ_ROLE,
+  djbanrole = process.env.DJ_BAN_ROLE
+
 client.on('ready', () =>
   console.log(`Logged in as ${client.user ? client.user.tag : 'unknown'}`)
 )
@@ -112,6 +113,13 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
   // Catch invalid states
   if (!interaction.isCommand() || !interaction.guildId) return
+  const badDJStatus = cannotDJ(djrole, djbanrole, interaction)
+  if (badDJStatus) {
+    await interaction.reply(
+      `Sorry, ${cannotDJReason(badDJStatus, djrole, djbanrole)}`
+    )
+    return
+  }
 
   // Get Queue
   let guildQueue = musicQueues.get(interaction.guildId)
@@ -182,112 +190,45 @@ client.on('interactionCreate', async (interaction) => {
         return
       }
 
-      let enqueue: null | Enqueueable | Enqueueable[] = []
-      // Lets find out what kind of link we got...
-      if (
-        /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=)?.*$/.test(
-          songQuery
-        )
-      ) {
-        // Is a youtube link!
-        enqueue = {
-          origin: 'youtube',
-          url: songQuery,
-          channelId: interaction.channelId,
-          queuedBy: interaction.user.id,
-        }
-      } else if (/https?:\/\/open\.spotify\.com\/track\/.*$/.test(songQuery)) {
-        // Is a spotify share link!
-        enqueue = await spotifyToYoutube(
-          songQuery,
-          interaction.channelId,
-          interaction.user.id
-        )
-      } else if (
-        /https?:\/\/open\.spotify\.com\/playlist\/.*$/.test(songQuery)
-      ) {
-        // Is a spotify playlist link
-        enqueue = await spotifyPlaylistToYoutube(
-          songQuery,
-          interaction.channelId,
-          interaction.user.id
-        )
-      } else {
-        // We're going to need to google it!
-        const searchResults = await youtubeSearch(songQuery)
-        if (!searchResults.length) enqueue = null
-        else
-          enqueue = {
-            origin: 'youtube-music',
-            url: `https://www.youtube.com/watch?v=${searchResults[0].videoId}`,
-            channelId: interaction.channelId,
-            queuedBy: interaction.user.id,
-            metadata: {
-              title: searchResults[0].name,
-              artist: Array.isArray(searchResults[0].artist)
-                ? searchResults[0].artist[0].name
-                : searchResults[0].artist.name,
-              album: searchResults[0].album.name,
-              artwork_url: searchResults[0].thumbnails[0],
-              duration: searchResults[0].duration / 1000,
-            },
-          }
-      }
+      const enqueue = await determineQueue(
+        songQuery,
+        interaction.channelId,
+        interaction.user.id
+      )
 
-      if (!enqueue) {
-        await interaction.followUp(
-          createReply(
-            "We're not sure what to do with your song request... Sorry!",
-            { status: 'warn' }
-          )
-        )
-        return
-      }
+      const enqueueResult = await enqueueItem(guildQueue, enqueue)
 
-      if (!Array.isArray(enqueue)) {
-        const response = await enqueueTrack(guildQueue, interaction, enqueue)
-
-        if (response.status) {
+      switch (enqueueResult.status) {
+        case 'single': {
           await interaction.followUp(
             createReply(
-              `Enqueued **${response.track.getTitle()}** [<@${
-                interaction.member?.user.id
-              }>]`
+              `Enqueued **${enqueueResult.trackName}** [<@${interaction.member?.user.id}>]`
             )
           )
-        } else {
-          await interaction.reply(
-            createReply('Failed to play track, please try again later!', {
-              status: 'warn',
-            })
-          )
+          break
         }
-      } else {
-        let success = false
-        let count = 0
-        for (const trackUrl of enqueue) {
-          const result = await enqueueTrack(
-            guildQueue,
-            interaction,
-            trackUrl,
-            true
-          )
-          if (result.status) {
-            success = true
-            count++
-          }
-        }
-
-        if (success) {
+        case 'multi': {
           guildQueue.start()
           await interaction.followUp(
-            createReply(`Enqueued **${count} Tracks** from playlist`)
+            createReply(
+              `Enqueued **${enqueueResult.count} Tracks** from playlist`
+            )
           )
-        } else {
+          break
+        }
+        case 'error': {
           await interaction.followUp(
             createReply('Failed to enqueue playlist, please try again later!', {
               status: 'warn',
             })
+          )
+        }
+        default: {
+          await interaction.followUp(
+            createReply(
+              "We're not sure what to do with your song request... Sorry!",
+              { status: 'warn' }
+            )
           )
         }
       }

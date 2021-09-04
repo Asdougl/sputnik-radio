@@ -54,8 +54,8 @@ export const getSpotifyPlaylist = async (link: string) => {
 
 export const spotifyPlaylistToYoutube = async (
   link: string,
-  channelId: string,
-  queuedBy: string
+  channelId?: string,
+  queuedBy?: string
 ) => {
   const spotifyInfoArr = await getSpotifyPlaylist(link)
   if (spotifyInfoArr === null || !spotifyInfoArr.length) return null

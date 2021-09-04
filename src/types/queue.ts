@@ -21,12 +21,13 @@ export interface TrackMetadata {
 export interface ExtendedTrackMetadata extends TrackMetadata {
   origin: QueueOrigin
   url: string
+  id: string
 }
 
 export interface Enqueueable {
   origin: QueueOrigin
   url: string
-  channelId: string
-  queuedBy: string
+  channelId?: string
+  queuedBy?: string
   metadata?: TrackMetadata
 }

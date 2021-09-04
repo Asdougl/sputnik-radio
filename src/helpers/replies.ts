@@ -45,12 +45,16 @@ export const createReply = (
 
 export const createNowPlaying = (
   metadata: TrackMetadata,
-  queuedBy: string
+  queuedBy?: string
 ): InteractionReplyOptions => {
   const embed = new MessageEmbed()
     .setAuthor('Now Playing...')
     .setTitle(metadata.title)
-    .setDescription(`${metadata.artist}\n\n[<@${queuedBy}>]`)
+    .setDescription(
+      queuedBy
+        ? `${metadata.artist}\n\n[<@${queuedBy}>]`
+        : `${metadata.artist}\n\n`
+    )
     .setThumbnail(metadata.artwork_url.url)
     .setColor(COLORS.PRIMARY)
 
