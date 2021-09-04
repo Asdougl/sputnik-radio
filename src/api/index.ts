@@ -53,7 +53,12 @@ app.get('/:guildId', (req, res) => {
 
     res.json(responseJson)
   } catch (error) {
-    res.status(400).send({ error: error.message })
+    res.status(400)
+    if (error instanceof Error) {
+      res.send({ error: error.message })
+    } else {
+      res.send({ error: 'Unknown Error' })
+    }
   }
 })
 
@@ -73,7 +78,12 @@ app.post('/:guildId', async (req, res) => {
 
     // TrackName
   } catch (error) {
-    res.status(400).send({ error: error.message })
+    res.status(400)
+    if (error instanceof Error) {
+      res.send({ error: error.message })
+    } else {
+      res.send({ error: 'Unknown Error' })
+    }
   }
 })
 

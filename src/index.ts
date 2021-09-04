@@ -49,7 +49,7 @@ client.on('messageCreate', async (message) => {
 
   if (
     message.content.toLowerCase() === '!launch-sputnik' &&
-    message.author.id === client.application?.owner?.id
+    message?.member?.permissions.has('ADMINISTRATOR')
   ) {
     console.log('Deploying Commands')
 
