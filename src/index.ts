@@ -99,6 +99,10 @@ client.on('messageCreate', async (message) => {
           name: COMMANDS.SHUFFLE,
           description: 'Shuffle the current queue',
         },
+        {
+          name: COMMANDS.UNDO,
+          description: 'Undo your last addition to the queue',
+        },
       ])
 
       await message.reply('Commands Deployed!')
@@ -253,6 +257,44 @@ client.on('interactionCreate', async (interaction) => {
             `<@${interaction.member?.user.id}> skipped **${currentTrackName}**`
           )
         )
+      } else {
+        await interaction.reply('Not playing in this server!')
+      }
+
+      break
+    }
+    /**
+     * Command to undo the last addition to the queue
+     */
+    case COMMANDS.UNDO: {
+      if (guildQueue && guildQueue.queue.length) {
+        const lastTrack = guildQueue.queue[guildQueue.queue.length - 1]
+        if (lastTrack.queuedBy === interaction.user.id) {
+          const poppedTrack = guildQueue.popQueue()
+          if (poppedTrack) {
+            await interaction.reply(
+              createReply(
+                `<@${interaction.member?.user.id}> undid **${poppedTrack.title}**`
+              )
+            )
+          } else {
+            await interaction.reply(
+              createReply(
+                `<@${interaction.member?.user.id}> could not undo **${
+                  lastTrack.getExtMetadata().title
+                }**`,
+                { status: 'warn' }
+              )
+            )
+          }
+        } else {
+          await interaction.reply(
+            createReply(
+              `<@${interaction.member?.user.id}> you can't undo someone else's track`,
+              { status: 'warn' }
+            )
+          )
+        }
       } else {
         await interaction.reply('Not playing in this server!')
       }

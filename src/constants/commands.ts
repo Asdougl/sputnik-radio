@@ -8,4 +8,5 @@ export enum COMMANDS {
   SEARCH = 'search',
   API = 'api',
   SHUFFLE = 'shuffle',
+  UNDO = 'undo',
 }

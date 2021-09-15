@@ -27,6 +27,7 @@ type QueueEventMap = {
   next: string
   queue: ExtendedTrackMetadata
   clear: undefined
+  pop: ExtendedTrackMetadata
 }
 
 interface QueueGuildInfo {
@@ -176,6 +177,15 @@ export class MusicQueue {
     if (wait !== true) void this.processQueue()
   }
 
+  public popQueue() {
+    const poppedTrack = this.queue.pop()
+    if (poppedTrack) {
+      const metadata = poppedTrack.getExtMetadata()
+      this.emit('pop', metadata)
+      return metadata
+    }
+  }
+
   public stop() {
     this.queue = []
     this.audioPlayer.stop(true)
@@ -236,6 +246,7 @@ export class MusicQueue {
       this.audioPlayer.play(resource)
       this.queueLock = false
     } catch (error) {
+      console.warn(error)
       this.sendMessage(
         createReply(`Error Playing ${nextTrack.getTitle()}`, { status: 'warn' })
       )
