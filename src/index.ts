@@ -156,6 +156,7 @@ client.on('interactionCreate', async (interaction) => {
           interaction.member.voice.channel
         ) {
           const channel = interaction.member.voice.channel
+          const guildId = interaction.guildId
           guildQueue = new MusicQueue(
             joinVoiceChannel({
               channelId: channel.id,
@@ -173,7 +174,8 @@ client.on('interactionCreate', async (interaction) => {
                 return channel
               }
               return null
-            }
+            },
+            () => musicQueues.delete(guildId)
           )
           guildQueue.voiceConnection.on('error', console.warn)
           musicQueues.set(interaction.guildId, guildQueue)

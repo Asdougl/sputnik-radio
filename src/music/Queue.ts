@@ -56,10 +56,14 @@ export class MusicQueue {
 
   private lastChannelId: string
 
+  private leaveTimeout: NodeJS.Timeout | null = null
+  private onLeave: () => void
+
   public constructor(
     voiceConnection: VoiceConnection,
     guildInfo: QueueGuildInfo,
-    getChannel: (channelId: string) => Promise<TextBasedChannels | null>
+    getChannel: (channelId: string) => Promise<TextBasedChannels | null>,
+    onLeave: () => void
   ) {
     this.voiceConnection = voiceConnection
     this.audioPlayer = createAudioPlayer()
@@ -68,6 +72,7 @@ export class MusicQueue {
     this.lastMessage = null
     this.getChannel = getChannel
     this.lastChannelId = ''
+    this.onLeave = onLeave
 
     this.queueEmitter = new EventEmitter()
 
@@ -154,6 +159,13 @@ export class MusicQueue {
         } else {
           console.log('NO LAST MESSAGE?!')
         }
+        if (this.queue.length === 0) {
+          if (this.leaveTimeout) clearTimeout(this.leaveTimeout)
+          this.leaveTimeout = setTimeout(() => {
+            this.voiceConnection.destroy()
+            this.onLeave()
+          }, 3600000)
+        }
         void this.processQueue()
       } else if (newState.status === AudioPlayerStatus.Playing) {
         // If the Playing state has been entered, then a new track has started playback.
@@ -177,6 +189,7 @@ export class MusicQueue {
   }
 
   public enqueue(track: Track, { wait, priority }: EnqueueOptions) {
+    if (this.leaveTimeout) clearTimeout(this.leaveTimeout)
     this.queue = [...this.queue, track]
     this.emit('queue', track.getExtMetadata())
     if (priority === true) {
