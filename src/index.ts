@@ -1,4 +1,4 @@
-import { Client, GuildMember, Intents, Message, Snowflake } from 'discord.js'
+import { Client, GuildMember, Intents } from 'discord.js'
 import {
   AudioPlayerStatus,
   AudioResource,
@@ -12,7 +12,7 @@ import { Track } from './music/Track'
 import { COMMANDS, SPECIAL_ARGS } from './constants/commands'
 import { createReply } from './helpers/replies'
 import './api'
-import { musicQueues } from './state'
+import { createQueue, musicQueues } from './state'
 import { secondsToDuration } from './helpers/time'
 import { formatToWidth } from './helpers/formatting'
 import { cannotDJ, cannotDJReason } from './helpers/roles'
@@ -151,35 +151,7 @@ client.on('interactionCreate', async (interaction) => {
       const songQuery = interaction.options.get('song')!.value! as string
 
       if (!guildQueue) {
-        if (
-          interaction.member instanceof GuildMember &&
-          interaction.member.voice.channel
-        ) {
-          const channel = interaction.member.voice.channel
-          const guildId = interaction.guildId
-          guildQueue = new MusicQueue(
-            joinVoiceChannel({
-              channelId: channel.id,
-              guildId: channel.guild.id,
-              adapterCreator: channel.guild.voiceAdapterCreator,
-            }),
-            {
-              name: interaction.guild?.name || '',
-              icon: interaction.guild?.icon || '',
-              acronym: interaction.guild?.nameAcronym || '',
-            },
-            async (channelId) => {
-              const channel = await client.channels.fetch(channelId)
-              if (channel && channel.isText()) {
-                return channel
-              }
-              return null
-            },
-            () => musicQueues.delete(guildId)
-          )
-          guildQueue.voiceConnection.on('error', console.warn)
-          musicQueues.set(interaction.guildId, guildQueue)
-        }
+        guildQueue = createQueue(interaction, client)
       }
 
       if (!guildQueue) {
@@ -438,6 +410,35 @@ client.on('interactionCreate', async (interaction) => {
      * Execute a special command
      */
     case COMMANDS.SPECIAL: {
+      if (!guildQueue) {
+        guildQueue = createQueue(interaction, client)
+      }
+
+      if (!guildQueue) {
+        await interaction.followUp(
+          createReply('Join a voice channel and then try that again', {
+            status: 'warn',
+          })
+        )
+        return
+      }
+
+      try {
+        await entersState(
+          guildQueue.voiceConnection,
+          VoiceConnectionStatus.Ready,
+          20e3
+        )
+      } catch (error) {
+        console.warn(error)
+        await interaction.followUp(
+          createReply(
+            'Failed to join voice channel within 20 seconds, please try again later!',
+            { status: 'warn' }
+          )
+        )
+        return
+      }
       if (guildQueue) {
         const arg = interaction.options.get('arg')!.value! as string
 
@@ -447,7 +448,7 @@ client.on('interactionCreate', async (interaction) => {
           await interaction.reply(createReply(`👍 All Good`))
         } else if (SPECIAL_ARGS.EDSHERE === arg) {
           const enqueue = await determineQueue(
-            'https://www.youtube.com/watch?v=rgc_LRjlbTU',
+            'https://www.youtube.com/watch?v=73vP02w3mwo',
             interaction.channelId,
             interaction.user.id
           )
@@ -455,7 +456,7 @@ client.on('interactionCreate', async (interaction) => {
 
           switch (enqueueResult.status) {
             case 'single': {
-              await interaction.followUp(
+              await interaction.reply(
                 createReply(
                   `Enqueued **${enqueueResult.trackName}** [<@${interaction.member?.user.id}>]`
                 )
@@ -464,7 +465,7 @@ client.on('interactionCreate', async (interaction) => {
             }
             case 'multi': {
               guildQueue.start()
-              await interaction.followUp(
+              await interaction.reply(
                 createReply(
                   `Enqueued **${enqueueResult.count} Tracks** from playlist`
                 )
@@ -472,7 +473,7 @@ client.on('interactionCreate', async (interaction) => {
               break
             }
             case 'error': {
-              await interaction.followUp(
+              await interaction.reply(
                 createReply(
                   'Failed to enqueue playlist, please try again later!',
                   {
@@ -482,7 +483,7 @@ client.on('interactionCreate', async (interaction) => {
               )
             }
             default: {
-              await interaction.followUp(
+              await interaction.reply(
                 createReply(
                   "We're not sure what to do with your song request... Sorry!",
                   { status: 'warn' }

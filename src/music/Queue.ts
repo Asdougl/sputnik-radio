@@ -190,12 +190,19 @@ export class MusicQueue {
 
   public enqueue(track: Track, { wait, priority }: EnqueueOptions) {
     if (this.leaveTimeout) clearTimeout(this.leaveTimeout)
-    this.queue = [...this.queue, track]
-    this.emit('queue', track.getExtMetadata())
+
     if (priority === true) {
+      this.queue = [track, ...this.queue]
+      this.emit('queue', track.getExtMetadata())
+
       this.audioPlayer.stop()
       void this.processQueue()
-    } else if (wait !== true) void this.processQueue()
+    } else {
+      this.queue = [...this.queue, track]
+      this.emit('queue', track.getExtMetadata())
+
+      if (wait !== true) void this.processQueue()
+    }
   }
 
   public popQueue() {
