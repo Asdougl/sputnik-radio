@@ -9,7 +9,7 @@ import {
 import dotenv from 'dotenv'
 import { MusicQueue } from './music/Queue'
 import { Track } from './music/Track'
-import { COMMANDS } from './constants/commands'
+import { COMMANDS, SPECIAL_ARGS } from './constants/commands'
 import { createReply } from './helpers/replies'
 import './api'
 import { musicQueues } from './state'
@@ -102,6 +102,18 @@ client.on('messageCreate', async (message) => {
         {
           name: COMMANDS.UNDO,
           description: 'Undo your last addition to the queue',
+        },
+        {
+          name: COMMANDS.SPECIAL,
+          description: 'Special Actions',
+          options: [
+            {
+              name: 'arg',
+              type: 'STRING' as const,
+              description: 'The special argument',
+              required: true,
+            },
+          ],
         },
       ])
 
@@ -415,6 +427,74 @@ client.on('interactionCreate', async (interaction) => {
         await interaction.reply(
           createReply(`[<@${interaction.user.id}>] just shuffled the queue`)
         )
+      } else {
+        await interaction.reply('Not playing in this server!')
+      }
+      break
+    }
+    /**
+     * Execute a special command
+     */
+    case COMMANDS.SPECIAL: {
+      if (guildQueue) {
+        const arg = interaction.options.get('arg')!.value! as string
+
+        if (SPECIAL_ARGS.SKIPWILL === arg) {
+          guildQueue.purgeFrom('437138777585221632')
+
+          await interaction.reply(createReply(`👍 All Good`))
+        } else if (SPECIAL_ARGS.EDSHERE === arg) {
+          const enqueue = await determineQueue(
+            'https://www.youtube.com/watch?v=rgc_LRjlbTU',
+            interaction.channelId,
+            interaction.user.id
+          )
+          const enqueueResult = await enqueueItem(guildQueue, enqueue, true)
+
+          switch (enqueueResult.status) {
+            case 'single': {
+              await interaction.followUp(
+                createReply(
+                  `Enqueued **${enqueueResult.trackName}** [<@${interaction.member?.user.id}>]`
+                )
+              )
+              break
+            }
+            case 'multi': {
+              guildQueue.start()
+              await interaction.followUp(
+                createReply(
+                  `Enqueued **${enqueueResult.count} Tracks** from playlist`
+                )
+              )
+              break
+            }
+            case 'error': {
+              await interaction.followUp(
+                createReply(
+                  'Failed to enqueue playlist, please try again later!',
+                  {
+                    status: 'warn',
+                  }
+                )
+              )
+            }
+            default: {
+              await interaction.followUp(
+                createReply(
+                  "We're not sure what to do with your song request... Sorry!",
+                  { status: 'warn' }
+                )
+              )
+            }
+          }
+        } else {
+          await interaction.reply(
+            createReply("I don't know that command, sorry", {
+              status: 'warn',
+            })
+          )
+        }
       } else {
         await interaction.reply('Not playing in this server!')
       }

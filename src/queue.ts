@@ -65,15 +65,25 @@ interface EnqueueTrackResultFailure extends EnqueueTrackResult {
   status: false
 }
 
-export const enqueueTrack = async (
-  guildQueue: MusicQueue,
-  enqueueable: Enqueueable,
+interface EnqueueTrackParams {
+  guildQueue: MusicQueue
+  enqueueable: Enqueueable
   wait?: boolean
-): Promise<EnqueueTrackResultSuccess | EnqueueTrackResultFailure> => {
+  priority?: boolean
+}
+
+export const enqueueTrack = async ({
+  guildQueue,
+  enqueueable,
+  wait,
+  priority,
+}: EnqueueTrackParams): Promise<
+  EnqueueTrackResultSuccess | EnqueueTrackResultFailure
+> => {
   try {
     const track = await Track.from(enqueueable)
 
-    guildQueue.enqueue(track, wait)
+    guildQueue.enqueue(track, { wait, priority })
 
     return { status: true, track }
   } catch (error) {
@@ -114,14 +124,19 @@ type EnqueueItemResultOptions =
 
 export const enqueueItem = async (
   queue: MusicQueue,
-  enqueueables: null | Enqueueable | Enqueueable[]
+  enqueueables: null | Enqueueable | Enqueueable[],
+  priority?: boolean
 ): Promise<EnqueueItemResultOptions> => {
   if (!enqueueables) {
     return { status: 'none' }
   }
 
   if (!Array.isArray(enqueueables)) {
-    const response = await enqueueTrack(queue, enqueueables)
+    const response = await enqueueTrack({
+      guildQueue: queue,
+      enqueueable: enqueueables,
+      priority,
+    })
     return response.status
       ? { status: 'single', trackName: response.track.getTitle() }
       : { status: 'error' }
@@ -130,7 +145,11 @@ export const enqueueItem = async (
   let success = false
   let count = 0
   for (const enqueue of enqueueables) {
-    const result = await enqueueTrack(queue, enqueue)
+    const result = await enqueueTrack({
+      guildQueue: queue,
+      enqueueable: enqueue,
+      priority,
+    })
     if (result.status) {
       success = true
       count++

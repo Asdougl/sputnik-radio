@@ -36,6 +36,11 @@ interface QueueGuildInfo {
   acronym: string
 }
 
+interface EnqueueOptions {
+  wait?: boolean
+  priority?: boolean
+}
+
 export class MusicQueue {
   public readonly voiceConnection: VoiceConnection
   public readonly audioPlayer: AudioPlayer
@@ -171,10 +176,13 @@ export class MusicQueue {
     voiceConnection.subscribe(this.audioPlayer)
   }
 
-  public enqueue(track: Track, wait?: boolean) {
+  public enqueue(track: Track, { wait, priority }: EnqueueOptions) {
     this.queue = [...this.queue, track]
     this.emit('queue', track.getExtMetadata())
-    if (wait !== true) void this.processQueue()
+    if (priority === true) {
+      this.audioPlayer.stop()
+      void this.processQueue()
+    } else if (wait !== true) void this.processQueue()
   }
 
   public popQueue() {
@@ -205,6 +213,10 @@ export class MusicQueue {
     if (this.queue.length) {
       this.queue = shuffle(this.queue)
     }
+  }
+
+  public purgeFrom(userId: string) {
+    this.queue = this.queue.filter((track) => track.queuedBy !== userId)
   }
 
   public on<T extends keyof QueueEventMap>(

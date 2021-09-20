@@ -9,4 +9,10 @@ export enum COMMANDS {
   API = 'api',
   SHUFFLE = 'shuffle',
   UNDO = 'undo',
+  SPECIAL = 'special',
+}
+
+export enum SPECIAL_ARGS {
+  SKIPWILL = 'skip will',
+  EDSHERE = 'eds here',
 }
