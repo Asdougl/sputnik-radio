@@ -36,9 +36,12 @@ jobs:
           npm install
 
       - name: Run Tests
-        run: |
-          npm run test
+        run: npm run test
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          DISCORD_APP_ID: ${{ secrets.DISCORD_APP_ID }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
 
       - name: Build Test
-        run: |
-          npm run build
+        run: npm run build
