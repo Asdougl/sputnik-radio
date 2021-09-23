@@ -35,7 +35,13 @@ export const getSpotifyApiKey = async () => {
 
     return key
   } catch (error) {
-    console.warn(error)
+    if (axios.isAxiosError(error)) {
+      console.warn(error.response ? error.response.data : error.message)
+    } else if (error instanceof Error) {
+      console.warn(error.message)
+    } else {
+      console.warn(error)
+    }
     return null
   }
 }

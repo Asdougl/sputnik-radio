@@ -34,17 +34,20 @@ export const getSpotifyPlaylist = async (link: string) => {
       )
 
       if (isSpotifyError(data)) {
-        throw new Error(
-          data.error.message === 'invalid id'
-            ? 'Invalid Spotify Link'
-            : 'Unknown Spotify Error'
-        )
+        return null
       }
 
       // FYI spotify api returns max 100 items
       return data.items.map(({ track }) => track)
     } catch (error) {
-      console.warn(error.response ? error.response.data : error.message)
+      if (axios.isAxiosError(error)) {
+        if (error.response && error.response.status === 404) return null
+        console.log(error.response ? error.response.data : error.message)
+      } else if (error instanceof Error) {
+        console.log(error.message)
+      } else {
+        console.log(error)
+      }
       return null
     }
   }

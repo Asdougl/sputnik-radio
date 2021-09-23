@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { musicQueues } from '../state'
+import { musicQueues } from '../queues/state'
 import { AudioPlayerStatus, AudioResource } from '@discordjs/voice'
 import { Track } from '../music/Track'
 import { TrackResponse } from './responses'

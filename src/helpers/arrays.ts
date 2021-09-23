@@ -1,14 +1,15 @@
 export const shuffle = (array: any[]) => {
-  let currentIndex = array.length,
+  let arrayCopy = [...array]
+  let currentIndex = arrayCopy.length,
     randomIndex
   while (currentIndex != 0) {
     randomIndex = Math.floor(Math.random() * currentIndex)
     currentIndex--
-    ;[array[currentIndex], array[randomIndex]] = [
-      array[randomIndex],
-      array[currentIndex],
+    ;[arrayCopy[currentIndex], arrayCopy[randomIndex]] = [
+      arrayCopy[randomIndex],
+      arrayCopy[currentIndex],
     ]
   }
 
-  return array
+  return arrayCopy
 }

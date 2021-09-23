@@ -1,10 +1,27 @@
 import { joinVoiceChannel } from '@discordjs/voice'
 import { Snowflake } from 'discord-api-types'
 import { Client, CommandInteraction, GuildMember } from 'discord.js'
-import e from 'express'
+import { DiscordBotError } from '../bot'
 import { MusicQueue } from '../music/Queue'
 
 export const musicQueues = new Map<Snowflake, MusicQueue>()
+
+export const getQueue = (
+  interaction: CommandInteraction,
+  client: Client<boolean>
+): MusicQueue => {
+  const guildId = interaction.guildId
+  if (!guildId)
+    throw new DiscordBotError('No Guild', 'You must be in a Server to use')
+
+  let queue = musicQueues.get(guildId)
+  if (queue) return queue
+
+  queue = createQueue(interaction, client)
+  if (!queue)
+    throw new DiscordBotError('Create Error', 'Not playing in this server!')
+  return queue
+}
 
 export const createQueue = (
   interaction: CommandInteraction,
