@@ -172,7 +172,7 @@ export class MusicQueue {
         const newTrack = (newState.resource as AudioResource<Track>).metadata
         this.emit('next', newTrack.id)
         this.sendMessage(
-          createNowPlaying(newTrack.metadata, newTrack.queuedBy),
+          createNowPlaying(newTrack.metadata, newTrack.url, newTrack.queuedBy),
           newTrack
         )
       }

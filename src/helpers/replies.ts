@@ -45,6 +45,7 @@ export const createReply = (
 
 export const createNowPlaying = (
   metadata: TrackMetadata,
+  url: string,
   queuedBy?: string
 ): InteractionReplyOptions => {
   const embed = new MessageEmbed()
@@ -52,7 +53,7 @@ export const createNowPlaying = (
     .setTitle(metadata.title)
     .setDescription(
       queuedBy
-        ? `${metadata.artist}\n\n[<@${queuedBy}>]`
+        ? `${metadata.artist}\n\n[YouTube](${url})\n\n[<@${queuedBy}>]`
         : `${metadata.artist}\n\n`
     )
     .setThumbnail(metadata.artwork_url.url)
