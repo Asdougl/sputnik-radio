@@ -42,7 +42,7 @@ export const determineQueue = async (
         metadata: {
           title: searchResults[0].name,
           artist: Array.isArray(searchResults[0].artist)
-            ? searchResults[0].artist[0].name
+            ? searchResults[0].artist[0]?.name || 'Unknown'
             : searchResults[0].artist.name,
           album: searchResults[0].album.name,
           artwork_url: searchResults[0].thumbnails[0],

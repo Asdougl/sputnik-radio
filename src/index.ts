@@ -1,6 +1,7 @@
 import {
   ApplicationCommandOptionType,
   Client,
+  CommandInteraction,
   GatewayIntentBits,
 } from 'discord.js'
 import {
@@ -41,6 +42,25 @@ client.on('ready', () =>
     `Sputnik Radio is Online as [${client.user ? client.user.tag : 'unknown'}]`
   )
 )
+
+const handleError = ({
+  error,
+  interaction,
+}: {
+  error: unknown
+  interaction: CommandInteraction
+}) => {
+  console.warn(error)
+
+  if (error instanceof DiscordBotError) {
+    return interaction.reply(createReply(error.message, { status: 'warn' }))
+  }
+  return interaction.reply(
+    createReply('An error occurred. Please try again later comrade', {
+      status: 'error',
+    })
+  )
+}
 
 const launchCommand = process.env.PREFIX
   ? `!launch-sputnik-${process.env.PREFIX}`
@@ -211,7 +231,7 @@ bot.on(COMMANDS.PLAY, async ({ interaction, getGuildQueue }) => {
       }
     }
   } catch (error) {
-    await interaction.reply('We had an error on our side, apologies comrade')
+    handleError({ error, interaction })
   }
 })
 
@@ -236,7 +256,7 @@ bot.on(COMMANDS.SKIP, async ({ interaction, getGuildQueue }) => {
       await interaction.reply('Not playing in this server!')
     }
   } catch (error) {
-    await interaction.reply('We had an error on our side, apologies comrade')
+    handleError({ error, interaction })
   }
 })
 
@@ -279,7 +299,7 @@ bot.on(COMMANDS.UNDO, async ({ interaction, getGuildQueue }) => {
       await interaction.reply('Not playing in this server!')
     }
   } catch (error) {
-    await interaction.reply('We had an error on our side, apologies comrade')
+    handleError({ error, interaction })
   }
 })
 
@@ -325,11 +345,7 @@ bot.on(COMMANDS.QUEUE, async ({ interaction, getGuildQueue }) => {
       )
     }
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -345,11 +361,7 @@ bot.on(COMMANDS.CLEAR, async ({ interaction, getGuildQueue }) => {
     guildQueue.stop()
     await interaction.reply(createReply('Current queue cleared'))
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -361,7 +373,7 @@ bot.on(COMMANDS.GUI, async ({ interaction }) => {
     // display a link to this queue's GUI
     await interaction.reply(createReply('```\nFunctionality coming soon!\n```'))
   } catch (error) {
-    await interaction.reply('We had an error on our side, apologies comrade')
+    handleError({ error, interaction })
   }
 })
 
@@ -377,11 +389,7 @@ bot.on(COMMANDS.LEAVE, async ({ interaction, getGuildQueue, guildId }) => {
     musicQueues.delete(guildId)
     await interaction.reply({ content: 'Left channel!', ephemeral: true })
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -392,11 +400,7 @@ bot.on(COMMANDS.SEARCH, async ({ interaction }) => {
   try {
     await interaction.reply(createReply('```\nFunctionality coming soon!\n```'))
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -407,11 +411,7 @@ bot.on(COMMANDS.API, async ({ interaction }) => {
   try {
     await interaction.reply(`http://localhost:5000/${interaction.guildId}`)
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -427,11 +427,7 @@ bot.on(COMMANDS.SHUFFLE, async ({ interaction, getGuildQueue }) => {
       createReply(`[<@${interaction.user.id}>] just shuffled the queue`)
     )
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
@@ -531,11 +527,7 @@ bot.on(COMMANDS.SPECIAL, async ({ interaction, getGuildQueue }) => {
       await interaction.reply('Not playing in this server!')
     }
   } catch (error) {
-    if (error instanceof DiscordBotError) {
-      await interaction.reply(createReply(error.message, { status: 'warn' }))
-    } else {
-      await interaction.reply('We had an error on our side, apologies comrade')
-    }
+    handleError({ error, interaction })
   }
 })
 
