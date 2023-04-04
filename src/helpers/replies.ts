@@ -1,9 +1,13 @@
-import { InteractionReplyOptions, MessageEmbed } from 'discord.js'
+import {
+  BaseMessageOptions,
+  EmbedBuilder,
+  InteractionReplyOptions,
+} from 'discord.js'
 import { COLORS } from '../constants/colours'
 import { TrackMetadata } from '../types/queue'
 
 export const createEmbedReply = (baseText: string) => {
-  return new MessageEmbed().setColor('#cd0001').setDescription(baseText)
+  return new EmbedBuilder().setColor('#cd0001').setDescription(baseText)
 }
 
 type ReplyType = 'log' | 'warn' | 'error'
@@ -17,11 +21,11 @@ export interface ReplyOptions {
 export const createReply = (
   baseText: string,
   options?: ReplyOptions
-): InteractionReplyOptions => {
-  const embed = new MessageEmbed().setDescription(baseText)
+): BaseMessageOptions => {
+  const embed = new EmbedBuilder().setDescription(baseText)
 
   if (options?.footer) {
-    embed.setFooter(options.footer)
+    embed.setFooter({ text: options.footer })
   }
 
   if (options?.image_url) {
@@ -47,9 +51,9 @@ export const createNowPlaying = (
   metadata: TrackMetadata,
   url: string,
   queuedBy?: string
-): InteractionReplyOptions => {
-  const embed = new MessageEmbed()
-    .setAuthor('Now Playing...')
+): BaseMessageOptions => {
+  const embed = new EmbedBuilder()
+    .setAuthor({ name: 'Now Playing...' })
     .setTitle(metadata.title)
     .setDescription(
       queuedBy

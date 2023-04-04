@@ -1,4 +1,8 @@
-import { Client, Intents } from 'discord.js'
+import {
+  ApplicationCommandOptionType,
+  Client,
+  GatewayIntentBits,
+} from 'discord.js'
 import {
   AudioPlayerStatus,
   AudioResource,
@@ -9,7 +13,6 @@ import dotenv from 'dotenv'
 import { Track } from './music/Track'
 import { command, COMMANDS, SPECIAL_ARGS } from './constants/commands'
 import { createReply } from './helpers/replies'
-import './api'
 import { musicQueues } from './queues/state'
 import { secondsToDuration } from './helpers/time'
 import { formatToWidth } from './helpers/formatting'
@@ -27,9 +30,9 @@ console.log('Initialising Sputnik Radio...')
 // Initialise Client
 const client = new Client({
   intents: [
-    Intents.FLAGS.GUILDS,
-    Intents.FLAGS.GUILD_MESSAGES,
-    Intents.FLAGS.GUILD_VOICE_STATES,
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 })
 
@@ -50,7 +53,7 @@ client.on('messageCreate', async (message) => {
 
   if (
     message.content.toLowerCase() === launchCommand &&
-    message?.member?.permissions.has('ADMINISTRATOR')
+    message?.member?.permissions.has('Administrator')
   ) {
     console.log('Deploying Commands')
 
@@ -62,7 +65,7 @@ client.on('messageCreate', async (message) => {
           options: [
             {
               name: 'song',
-              type: 'STRING' as const,
+              type: ApplicationCommandOptionType.String,
               description: 'The URL of the song to play',
               required: true,
             },
@@ -110,7 +113,7 @@ client.on('messageCreate', async (message) => {
           options: [
             {
               name: 'arg',
-              type: 'STRING' as const,
+              type: ApplicationCommandOptionType.String,
               description: 'The special argument',
               required: true,
             },

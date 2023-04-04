@@ -3,8 +3,8 @@ import {
   createAudioResource,
   demuxProbe,
 } from '@discordjs/voice'
-import { raw as ytdl } from 'youtube-dl-exec'
-import { getInfo } from 'ytdl-core'
+// import {  } from 'youtube-dl-exec'
+import { getInfo, downloadFromInfo } from 'ytdl-core'
 import { v4 as uuidv4 } from 'uuid'
 import {
   Enqueueable,
@@ -58,31 +58,17 @@ export class Track implements TrackData {
    */
   public createAudioResource(): Promise<AudioResource<Track>> {
     return new Promise((resolve, reject) => {
-      const process = ytdl(
-        this.url,
-        {
-          o: '-',
-          q: '',
-          f: 'bestaudio[ext=webm+acodec=opus+asr=48000]/bestaudio',
-          r: '100K',
-        },
-        { stdio: ['ignore', 'pipe', 'ignore'] }
-      )
-
-      if (!process.stdout) {
-        reject(new Error('No stdout'))
-        return
-      }
-
-      const stream = process.stdout
       const onError = (error: Error) => {
-        if (!process.killed) process.kill()
-        stream.resume()
         reject(error)
       }
 
-      process
-        .once('spawn', () => {
+      getInfo(this.url)
+        .then((info) => {
+          const stream = downloadFromInfo(info, {
+            filter: 'audioonly',
+            quality: 'highestaudio',
+          })
+
           demuxProbe(stream)
             .then((probe) => {
               resolve(
@@ -93,10 +79,10 @@ export class Track implements TrackData {
               )
             })
             .catch(onError)
+
+          process.on('error', onError)
         })
         .catch(onError)
-
-      process.on('error', onError)
     })
   }
 

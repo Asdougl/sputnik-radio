@@ -12,9 +12,9 @@ import { Track } from './Track'
 import { promisify } from 'util'
 import {
   Message,
-  MessageOptions,
+  MessageCreateOptions,
   MessagePayload,
-  TextBasedChannels,
+  TextBasedChannel,
 } from 'discord.js'
 import { createNowPlaying, createReply } from '../helpers/replies'
 import { shuffle } from '../helpers/arrays'
@@ -47,7 +47,7 @@ export class MusicQueue {
   public readonly guildInfo: QueueGuildInfo
   public readonly getChannel: (
     channelId: string
-  ) => Promise<TextBasedChannels | null>
+  ) => Promise<TextBasedChannel | null>
   public lastMessage: Message | null
   public queue: Track[]
   public queueLock = false
@@ -62,7 +62,7 @@ export class MusicQueue {
   public constructor(
     voiceConnection: VoiceConnection,
     guildInfo: QueueGuildInfo,
-    getChannel: (channelId: string) => Promise<TextBasedChannels | null>,
+    getChannel: (channelId: string) => Promise<TextBasedChannel | null>,
     onLeave: () => void
   ) {
     this.voiceConnection = voiceConnection
@@ -288,7 +288,7 @@ export class MusicQueue {
   }
 
   private async sendMessage(
-    messageContents: string | MessagePayload | MessageOptions,
+    messageContents: string | MessagePayload | MessageCreateOptions,
     track?: Track
   ) {
     this.getChannel(

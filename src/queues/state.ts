@@ -47,7 +47,7 @@ export const createQueue = (
       },
       async (channelId) => {
         const channel = await client.channels.fetch(channelId)
-        if (channel && channel.isText()) {
+        if (channel && channel.isTextBased()) {
           return channel
         }
         return null

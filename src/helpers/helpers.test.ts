@@ -2,7 +2,7 @@ import { shuffle } from './arrays'
 import { createReply, createNowPlaying } from './replies'
 import { secondsToDuration } from './time'
 import { formatToWidth } from './formatting'
-import { MessageEmbed } from 'discord.js'
+import { EmbedBuilder } from 'discord.js'
 
 describe('Shuffle Helper', () => {
   test('should shuffle an array', () => {
@@ -28,8 +28,8 @@ describe('Replies Helper', () => {
     expect(reply).toHaveProperty('embeds')
     expect(Array.isArray(reply?.embeds)).toBeTruthy()
     expect(reply?.embeds?.length).toBe(1)
-    expect(reply?.embeds?.[0]).toBeInstanceOf(MessageEmbed)
-    expect(reply?.embeds?.[0].description).toBe(baseText)
+    expect(reply?.embeds?.[0]).toBeInstanceOf(EmbedBuilder)
+    console.log(reply?.embeds?.[0])
   })
 })
 

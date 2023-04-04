@@ -15,20 +15,18 @@ export const getSpotifyApiKey = async () => {
   try {
     const params = new URLSearchParams()
     params.append('grant_type', 'client_credentials')
+    params.append('client_id', process.env.SPOTIFY_CLIENT_ID || '')
+    params.append('client_secret', process.env.SPOTIFY_CLIENT_SECRET || '')
 
-    const basicAuth = Buffer.from(
-      `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-    ).toString('base64')
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      body: params,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
 
-    const { data } = await axios.post<SpotifyKeysData>(
-      'https://accounts.spotify.com/api/token',
-      params,
-      {
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-        },
-      }
-    )
+    const data = (await response.json()) as SpotifyKeysData
 
     key = data.access_token
     expiresAt = Date.now() + data.expires_in * 1000
